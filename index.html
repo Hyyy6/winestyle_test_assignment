@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="css_stuff.css">
+    <title>WineStyle Test Assignment</title>
+
+
+    <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-modal/0.9.1/jquery.modal.min.css" />
+    <script src="scripts/jquery-3.4.1.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <script src="scripts/jquery.ui.monthpicker.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-modal/0.9.1/jquery.modal.min.js"></script>
+    <script>
+        //var clickedWorker; //very bad code
+
+        $(function() {
+            $("#datepicker" ).monthpicker({
+                showAnim: null,
+                dateFormat: 'yy-mm',
+                onClose: getWorkers
+            });
+        } );
+
+        function getWorkers() {
+            $.ajax({
+                url: "getWorkers.php",
+                type: "POST",
+                data: {monthYearVal: $("#datepicker").val()},
+                success: function(data){
+                    $("#content").empty();
+                    $("#content").append(data);
+                }
+            })
+        }
+
+        function addWorker() {
+            $.ajax({
+                url: "addWorker.php",
+                type: "POST",
+                data: {
+                    add_first_name: $("#add_first_name").val(),
+                    add_last_name: $("#add_last_name").val(),
+                    add_position: $("#add_position").val(),
+                    add_wage: $("#add_wage").val()
+                },
+                success: function() {
+                    alert("The worker has been successfully added");
+                    getWorkers();
+                }
+            })
+        }
+
+        function addBonus() {
+            $.ajax({
+                url: "addBonus.php",
+                type: "POST",
+                data: {
+                    bonus: $("#bonus").val(),
+                    position: $("#bonus_position").val(),
+                    monthYearVal: $("#datepicker").val()
+                },
+                success: function(data) {
+                    //console.log(data);
+                    getWorkers();
+                }
+            })
+        }
+
+        $(document).ready(function() {
+            //get RUB to USR conversion ratio
+            let RUBtoUSD_rate;
+            $.getJSON("http://data.fixer.io/api/latest?access_key=7a346379951c39b990699c26ee567980&symbols=RUB,USD", function( data ) {
+                RUBtoUSD_rate = data.rates.RUB / data.rates.USD;
+            });
+
+            let date = new Date();
+            $("#datepicker").val(date.getFullYear() + '-' + (date.getMonth()+1));
+            getWorkers();
+
+            $(document).on('click', '.photo_url', function() {
+                $("#fullPhoto").attr("src", $(this).attr("src"));
+            });
+
+            //bad code
+            $(document).on('click', '.divTableRow', function() {
+                let tmp = $(this).attr("id");
+                //alert(tmp);
+                $("#workerId").prop('value', tmp);
+                //alert($("#workerId").val());
+            });
+
+            $.ajax({
+                url: "getPositions.php",
+                success: function(data){
+                    $("#add_position, #bonus_position").empty();
+                    $("#add_position, #bonus_position").append(data);
+                }
+            });
+
+            $("#uploadImage_form").on('submit', function(e) {
+                e.preventDefault();
+                $.ajax({
+                    url: "photoUpload.php",
+                    type: "POST",
+                    data:  new FormData(this),
+                    contentType: false,
+                    cache: false,
+                    processData: false,
+                    beforeSend : function()
+                    {
+                        //$("#preview").fadeOut();
+                        $("#uploadImage_err").fadeOut();
+                    },
+                    success: function(data)
+                    {
+                        //alert(data);
+
+                        if(data=='invalid')
+                        {
+                            // invalid file format.
+                            $("#uploadImage_err").html("Invalid File !").fadeIn();
+                        }
+                        else
+                        {
+                            // view uploaded file.
+                            $("#uploadImage_preview").html(data).attr("width", 256).fadeIn();
+                            $("#uploadImage_form")[0].reset();
+                        }
+                        getWorkers();
+                    },
+                    error: function(e)
+                    {
+                        $("#uploadImage_err").html(e).fadeIn();
+                    }
+                });
+            });
+
+            $("#RUBtoUSD").on("change", function(){
+                let checked = $(this).is(':checked');
+
+                if(!checked)
+                    getWorkers(); //to avoid floating point calculation error
+                else {
+                    //convert wages
+                    $("[name='wage']").each(function () {
+                        //console.log($(this).html());
+                        if (checked) {
+                            //console.log($(this).html());
+                            $(this).html(parseInt($(this).html()) / RUBtoUSD_rate);
+                            //console.log($(this).html());
+                        } else {
+                            $(this).html(parseInt($(this).html()) * RUBtoUSD_rate);
+                            //console.log($(this).html());
+                        }
+                    });
+                    //convert salaries
+                    $("[name='salary']").each(function () {
+                        //console.log($(this).html());
+                        if ($(this).html() != "No data") {
+                            if (checked) {
+                                $(this).html(parseInt($(this).html()) / RUBtoUSD_rate);
+                            } else {
+                                $(this).html(parseInt($(this).html()) * RUBtoUSD_rate);
+                            }
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+
+</head>
+<body>
+
+<div id="ex1" class="modal" >
+    <a href="#" rel="modal:close">
+        <img id="fullPhoto" >
+    </a>
+</div>
+
+<div id="ex2" class="modal" >
+    <form id="uploadImage_form" action="photoUpload.php" method="post" enctype="multipart/form-data">
+        <input id="workerId" name="workerId" type="text" type="hidden">
+        <input id="uploadImage" type="file" accept="image/*" name="image" />
+        <div id="uploadImage_preview"><img src="filed.png" width="256"/></div><br>
+        <input class="btn btn-success" type="submit" value="Upload">
+    </form>
+
+    <div id="uploadImage_err"></div>
+</div>
+
+<p>Date: <input type="text" id="datepicker" value=></p>
+
+<div id="content"></div>
+
+<hr>
+
+<div>
+    <p>Add a worker.</p>
+    <form class="form-inline" action="javascript:void(0);">
+        <label for="add_first_name">First name:</label>
+        <input type="text" id="add_first_name" placeholder="Vasya">
+        <label for="add_last_name">Last name</label>
+        <input type="text" id="add_last_name" placeholder="Pupkin">
+        <label for="add_position">Position</label>
+        <select id="add_position"></select>
+        <label for="add_wage">Wage</label>
+        <input type="number" id="add_wage">
+        <button onclick=addWorker()>Submit</button>
+    </form>
+</div>
+
+<hr>
+
+<p>Switch RUB/USD</p>
+<label class="switch">
+    <input type="checkbox" id="RUBtoUSD">
+    <span class="slider"></span>
+</label>
+
+<hr>
+<p>Give bonus for a set month to workers of a particular profession.</p>
+<form class="form-inline" action="javascript:void(0);">
+    <label for="bonus">Bonus: </label>
+    <input type="number" id="bonus" placeholder=0>
+    <label for="bonus_position">Position</label>
+    <select id="bonus_position"></select>
+    <button onclick=addBonus()>Submit</button>
+</form>
+
+</body>
+</html>
+
+
+<!-- http://data.fixer.io/api/latest?access_key=7a346379951c39b990699c26ee567980&symbols=RUB,USD >

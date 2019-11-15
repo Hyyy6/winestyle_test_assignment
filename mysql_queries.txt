@@ -1,0 +1,120 @@
+CREATE DATABASE IF NOT EXISTS winestyle_test;
+
+
+USE winestyle_test;
+
+
+CREATE TABLE professions (
+id INT auto_increment NOT NULL,
+name VARCHAR(20) NOT NULL,
+PRIMARY KEY (id, name)
+);
+
+
+INSERT INTO professions (name)
+VALUES ("бухгалтер"), ("курьер"), ("менеджер");
+
+
+CREATE TABLE workers (
+id INT AUTO_INCREMENT PRIMARY KEY,
+first_name VARCHAR(30) NOT NULL,
+last_name VARCHAR(30) NOT NULL,
+profession_id INT NOT NULL,
+wage INT,
+photo_url VARCHAR(200),
+FOREIGN KEY (profession_id)
+	REFERENCES professions(id)
+    ON DELETE CASCADE
+);
+
+
+CREATE TABLE payment (
+id INT AUTO_INCREMENT PRIMARY KEY,
+worker_id INT NOT NULL,
+salary INT,
+date DATE,
+FOREIGN KEY (worker_id)
+	REFERENCES workers(id)
+    ON DELETE CASCADE
+);
+
+#необходимо для добавления премии, в запросе в WHERE не присутствует ключевое поле изменяемой таблицы
+SET SQL_SAFE_UPDATES=0;
+
+#вспомогательное
+CREATE TABLE names (name VARCHAR(30));
+
+#вспомогательное
+INSERT INTO names VALUES
+("Masha"),
+("Petya"),
+("Alex"),
+("Anna"),
+("Peter");
+
+#вспомогательное
+CREATE TABLE surnames (surname VARCHAR(30));
+
+#вспомогательное
+INSERT INTO surnames VALUES
+("Sidorenko"),
+("Patinenko"),
+("Razko"),
+("Dvako"),
+("Triko");
+
+#вспомогательное
+DROP PROCEDURE IF EXISTS populateWorkers;
+DELIMITER //  
+CREATE PROCEDURE populateWorkers(
+	IN num INT
+)   
+BEGIN
+DECLARE i INT DEFAULT 0; 
+WHILE (i < num) DO
+    INSERT INTO workers (first_name, last_name, profession_id, wage) VALUES (
+	(SELECT * FROM names
+	ORDER BY RAND()
+	LIMIT 1),
+	(SELECT * FROM surnames
+	ORDER BY RAND()
+	LIMIT 1),
+    (SELECT FLOOR((RAND() * (3))+1)),
+    (SELECT FLOOR((RAND() * (50000))+10000))
+);
+    SET i = i+1;
+END WHILE;
+END;
+//  
+
+CALL populateWorkers(15); 
+
+#__________________________________________________________________________________
+select workers.id, first_name, last_name,
+ professions.name, wage, workers.wage, payment.salary
+ FROM 
+	workers INNER JOIN professions ON workers.profession_id = professions.id
+    LEFT JOIN payment ON workers.id = payment.worker_id
+ORDER BY workers.id;
+#__________________________________________________________________________________
+
+select workers.id, photo_url, first_name, last_name,
+ professions.name, workers.wage, payment.salary
+ FROM 
+	workers INNER JOIN professions ON workers.profession_id = professions.id
+    LEFT JOIN payment ON workers.id = payment.worker_id
+    AND payment.date = '2019-10-00'
+ORDER BY workers.id;
+
+#__________________________________________________________________________________
+
+insert into payment (worker_id, salary, date)
+VALUES (1, 1337, '2019-11-00'),
+(2, 1338, '2019-10-00'); 
+
+#__________________________________________________________________________________
+
+UPDATE workers SET photo_url = "photos/photo.jpg" WHERE id = 1;
+
+#__________________________________________________________________________________
+
